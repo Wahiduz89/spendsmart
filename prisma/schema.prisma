@@ -1,0 +1,158 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// User model with support for multiple auth providers
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  name          String?
+  emailVerified DateTime?
+  image         String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // Relations
+  accounts      Account[]
+  expenses      Expense[]
+  categories    Category[]
+  budgets       Budget[]
+  subscription  Subscription?
+
+  @@index([email])
+}
+
+// OAuth account connections
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@index([userId])
+}
+
+// Expense entries
+model Expense {
+  id            String         @id @default(cuid())
+  userId        String
+  amount        Float
+  description   String
+  date          DateTime
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  
+  // Payment method
+  paymentMethod PaymentMethod  @default(CASH)
+  
+  // Relations
+  user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  category      Category?      @relation(fields: [categoryId], references: [id])
+  categoryId    String?
+  
+  // Optional fields
+  merchant      String?
+  receiptUrl    String?
+  notes         String?
+  
+  @@index([userId, date])
+  @@index([categoryId])
+}
+
+// Expense categories
+model Category {
+  id          String    @id @default(cuid())
+  userId      String
+  name        String
+  icon        String?
+  color       String?
+  isDefault   Boolean   @default(false)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  
+  // Relations
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expenses    Expense[]
+  budgets     Budget[]
+  
+  @@unique([userId, name])
+  @@index([userId])
+}
+
+// Budget management
+model Budget {
+  id          String      @id @default(cuid())
+  userId      String
+  categoryId  String?
+  amount      Float
+  period      BudgetPeriod @default(MONTHLY)
+  startDate   DateTime
+  endDate     DateTime
+  isActive    Boolean     @default(true)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+  
+  // Relations
+  user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  category    Category?   @relation(fields: [categoryId], references: [id])
+  
+  @@index([userId, startDate, endDate])
+  @@index([categoryId])
+}
+
+// Subscription management
+model Subscription {
+  id               String    @id @default(cuid())
+  userId           String    @unique
+  plan             PlanType  @default(FREE)
+  status           String    @default("active")
+  currentPeriodEnd DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+  
+  // Relations
+  user             User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// Enums
+enum PaymentMethod {
+  CASH
+  CREDIT_CARD
+  DEBIT_CARD
+  UPI
+  WALLET
+  NET_BANKING
+  OTHER
+}
+
+enum BudgetPeriod {
+  WEEKLY
+  MONTHLY
+  QUARTERLY
+  YEARLY
+}
+
+enum PlanType {
+  FREE
+  PREMIUM
+  ENTERPRISE
+}
