@@ -37,7 +37,6 @@
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",
-    "@tailwindcss/postcss": "^4",
     "@types/bcryptjs": "^3.0.0",
     "@types/node": "^20.19.1",
     "@types/react": "^19.1.8",
@@ -47,7 +46,7 @@
     "eslint-config-next": "^15.3.4",
     "postcss": "^8.5.6",
     "prisma": "^6.10.1",
-    "tailwindcss": "^4.1.10",
+    "tailwindcss": "^3.4.0",
     "typescript": "^5.8.3"
   }
 }
