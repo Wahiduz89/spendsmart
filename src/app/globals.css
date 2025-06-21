@@ -7,79 +7,142 @@
   :root {
     --background: 0 0% 100%;
     --foreground: 222.2 84% 4.9%;
+    --card: 0 0% 100%;
+    --card-foreground: 222.2 84% 4.9%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222.2 84% 4.9%;
     --primary: 22 93% 50%;
     --primary-foreground: 0 0% 100%;
     --secondary: 122 39% 49%;
     --secondary-foreground: 0 0% 100%;
-    --accent: 207 90% 54%;
-    --accent-foreground: 0 0% 100%;
     --muted: 210 40% 96.1%;
     --muted-foreground: 215.4 16.3% 46.9%;
+    --accent: 207 90% 54%;
+    --accent-foreground: 0 0% 100%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 214.3 31.8% 91.4%;
+    --input: 214.3 31.8% 91.4%;
+    --ring: 22 93% 50%;
     --radius: 0.5rem;
   }
 
+  .dark {
+    --background: 222.2 84% 4.9%;
+    --foreground: 210 40% 98%;
+    --card: 222.2 84% 4.9%;
+    --card-foreground: 210 40% 98%;
+    --popover: 222.2 84% 4.9%;
+    --popover-foreground: 210 40% 98%;
+    --primary: 210 40% 98%;
+    --primary-foreground: 222.2 84% 4.9%;
+    --secondary: 217.2 32.6% 17.5%;
+    --secondary-foreground: 210 40% 98%;
+    --muted: 217.2 32.6% 17.5%;
+    --muted-foreground: 215 20.2% 65.1%;
+    --accent: 217.2 32.6% 17.5%;
+    --accent-foreground: 210 40% 98%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 217.2 32.6% 17.5%;
+    --input: 217.2 32.6% 17.5%;
+    --ring: 212.7 26.8% 83.9%;
+  }
+}
+
+@layer base {
   * {
-    @apply border-border;
+    border-color: hsl(var(--border));
   }
 
   body {
-    @apply bg-background text-foreground;
+    background-color: hsl(var(--background));
+    color: hsl(var(--foreground));
     font-feature-settings: "rlig" 1, "calt" 1;
   }
 }
 
 @layer components {
-  /* Custom scrollbar */
   .custom-scrollbar::-webkit-scrollbar {
     width: 6px;
     height: 6px;
   }
 
   .custom-scrollbar::-webkit-scrollbar-track {
-    @apply bg-gray-100 rounded-full;
+    background-color: rgb(243 244 246);
+    border-radius: 9999px;
   }
 
   .custom-scrollbar::-webkit-scrollbar-thumb {
-    @apply bg-gray-400 rounded-full hover:bg-gray-500;
+    background-color: rgb(156 163 175);
+    border-radius: 9999px;
   }
 
-  /* Loading animation */
+  .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    background-color: rgb(107 114 128);
+  }
+
   .loading-spinner {
-    @apply inline-block w-8 h-8 border-4 border-gray-200 border-t-primary-500 rounded-full animate-spin;
+    display: inline-block;
+    width: 2rem;
+    height: 2rem;
+    border: 4px solid rgb(229 231 235);
+    border-top: 4px solid hsl(var(--primary));
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
   }
 
-  /* Glass morphism effect */
+  @keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+  }
+
   .glass {
-    @apply bg-white/80 backdrop-blur-md border border-white/20 shadow-lg;
+    background-color: rgba(255, 255, 255, 0.8);
+    backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
   }
 
-  /* Gradient text */
   .gradient-text {
-    @apply bg-gradient-to-r from-primary-500 to-accent-500 bg-clip-text text-transparent;
+    background: linear-gradient(to right, hsl(var(--primary)), hsl(var(--accent)));
+    background-clip: text;
+    -webkit-background-clip: text;
+    color: transparent;
   }
 
-  /* Card hover effects */
   .card-hover {
-    @apply transition-all duration-300 hover:shadow-lg hover:scale-[1.02] hover:border-primary-200;
+    transition: all 0.3s ease;
   }
 
-  /* Budget progress bars */
+  .card-hover:hover {
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+    transform: scale(1.02);
+    border-color: hsl(var(--primary) / 0.2);
+  }
+
   .progress-bar {
-    @apply relative h-2 bg-gray-200 rounded-full overflow-hidden;
+    position: relative;
+    height: 0.5rem;
+    background-color: rgb(229 231 235);
+    border-radius: 9999px;
+    overflow: hidden;
   }
 
   .progress-fill {
-    @apply absolute top-0 left-0 h-full transition-all duration-500 ease-out;
+    position: absolute;
+    top: 0;
+    left: 0;
+    height: 100%;
+    transition: all 0.5s ease-out;
   }
 
-  /* Indian rupee symbol */
   .rupee::before {
     content: "₹";
   }
 }
 
 @layer utilities {
-  /* Animation delays */
   .animation-delay-100 {
     animation-delay: 100ms;
   }
@@ -92,34 +155,30 @@
     animation-delay: 300ms;
   }
 
-  /* Text balance */
   .text-balance {
     text-wrap: balance;
   }
 }
 
-/* Print styles */
 @media print {
   .no-print {
     display: none !important;
   }
 
   body {
-    @apply bg-white;
+    background-color: white !important;
   }
 }
 
-/* Focus styles for accessibility */
 :focus-visible {
-  @apply outline-2 outline-offset-2 outline-primary-500;
+  outline: 2px solid hsl(var(--primary));
+  outline-offset: 2px;
 }
 
-/* Smooth scrolling */
 html {
   scroll-behavior: smooth;
 }
 
-/* Prevent layout shift from scrollbar */
 body {
   scrollbar-gutter: stable;
 }
