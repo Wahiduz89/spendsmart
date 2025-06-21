@@ -9,7 +9,7 @@ import {
   TargetIcon, 
   ChartBarIcon, 
   CogIcon,
-  XMarkIcon
+  X  // Changed from XMarkIcon to X
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 
@@ -58,7 +58,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
               size="icon"
               onClick={onClose}
             >
-              <XMarkIcon className="h-5 w-5" />
+              <X className="h-5 w-5" />  {/* Changed from XMarkIcon to X */}
             </Button>
           </div>
           
