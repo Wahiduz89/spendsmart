@@ -78,7 +78,7 @@ export default function HomePage() {
               <Link href="/signin">
                 <Button variant="outline">Sign In</Button>
               </Link>
-              <Link href="/signin">
+              <Link href="/signup">
                 <Button>Get Started Free</Button>
               </Link>
             </div>
@@ -97,7 +97,7 @@ export default function HomePage() {
             Track UPI, wallets, and cash expenses effortlessly. Get insights that help you save more and spend wisely.
           </p>
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-            <Link href="/signin">
+            <Link href="/signup">
               <Button size="lg" className="text-lg px-8">
                 Start Free Trial
               </Button>
@@ -191,7 +191,7 @@ export default function HomePage() {
           <p className="text-xl text-gray-600 mb-8">
             Free to use, no credit card required. Upgrade anytime for advanced features.
           </p>
-          <Link href="/signin">
+          <Link href="/signup">
             <Button size="lg" className="text-lg px-8">
               Get Started Now
             </Button>

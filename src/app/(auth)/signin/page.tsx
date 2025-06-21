@@ -17,8 +17,20 @@ export default function SignInPage() {
   const handleGoogleSignIn = async () => {
     setIsLoading(true)
     try {
-      await signIn('google', { callbackUrl })
+      const result = await signIn('google', { 
+        callbackUrl,
+        redirect: false // Prevent automatic redirect to debug issues
+      })
+      
+      if (result?.error) {
+        toast.error('Failed to sign in. Please try again.')
+        setIsLoading(false)
+      } else if (result?.url) {
+        // Successful sign in, redirect manually
+        window.location.href = result.url
+      }
     } catch (error) {
+      console.error('Sign in error:', error)
       toast.error('Failed to sign in. Please try again.')
       setIsLoading(false)
     }
@@ -104,7 +116,7 @@ export default function SignInPage() {
             <div className="text-center text-sm text-gray-600">
               <p>
                 Don't have an account?{' '}
-                <Link href="/signin" className="text-primary-600 hover:text-primary-700 font-medium">
+                <Link href="/signup" className="text-primary-600 hover:text-primary-700 font-medium">
                   Sign up for free
                 </Link>
               </p>
