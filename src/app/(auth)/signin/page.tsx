@@ -1,5 +1,6 @@
 'use client'
 
+import React from 'react'
 import { signIn } from 'next-auth/react'
 import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
@@ -13,25 +14,46 @@ export default function SignInPage() {
   const searchParams = useSearchParams()
   const [isLoading, setIsLoading] = useState(false)
   const callbackUrl = searchParams.get('callbackUrl') || '/dashboard'
+  const error = searchParams.get('error')
+
+  // Show error message if there's an auth error
+  React.useEffect(() => {
+    if (error) {
+      const errorMessages = {
+        'OAuthAccountNotLinked': 'Account linking failed. Please try signing in again.',
+        'OAuthSignin': 'Error occurred during sign in. Please try again.',
+        'OAuthCallback': 'OAuth callback error. Please try again.',
+        'OAuthCreateAccount': 'Could not create account. Please try again.',
+        'EmailCreateAccount': 'Could not create account. Please try again.',
+        'Callback': 'Authentication callback error. Please try again.',
+        'OAuthCallbackError': 'OAuth provider error. Please try again.',
+        'EmailSignin': 'Error sending email. Please try again.',
+        'CredentialsSignin': 'Invalid credentials. Please check your details.',
+        'SessionRequired': 'Please sign in to access this page.',
+        'default': 'An authentication error occurred. Please try again.'
+      }
+      
+      const message = errorMessages[error as keyof typeof errorMessages] || errorMessages.default
+      toast.error(message)
+    }
+  }, [error])
 
   const handleGoogleSignIn = async () => {
     setIsLoading(true)
     try {
       const result = await signIn('google', { 
         callbackUrl,
-        redirect: false // Prevent automatic redirect to debug issues
+        redirect: true // Let NextAuth handle redirects
       })
       
+      // If we reach here and there's an error, show it
       if (result?.error) {
-        toast.error('Failed to sign in. Please try again.')
+        toast.error('Sign in failed. Please try again.')
         setIsLoading(false)
-      } else if (result?.url) {
-        // Successful sign in, redirect manually
-        window.location.href = result.url
       }
     } catch (error) {
       console.error('Sign in error:', error)
-      toast.error('Failed to sign in. Please try again.')
+      toast.error('Sign in failed. Please try again.')
       setIsLoading(false)
     }
   }

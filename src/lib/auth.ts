@@ -21,8 +21,8 @@ export const authOptions: NextAuthOptions = {
   callbacks: {
     async session({ session, token, user }) {
       // Ensure session has user ID for database queries
-      if (session?.user && token?.sub) {
-        session.user.id = token.sub
+      if (session?.user && user?.id) {
+        session.user.id = user.id
       }
       return session
     },
@@ -33,69 +33,39 @@ export const authOptions: NextAuthOptions = {
       }
       return token
     },
-    async signIn({ user, account, profile }) {
+    // Remove the conflicting signIn callback - let PrismaAdapter handle it
+    // Instead, use the user creation event
+  },
+  events: {
+    async createUser({ user }) {
       try {
-        if (account?.provider === "google") {
-          // Check if user already exists
-          const existingUser = await prisma.user.findUnique({
-            where: { email: user.email! },
-            include: { 
-              categories: true,
-              subscription: true 
-            }
-          })
+        // Create default categories when a new user is created
+        await prisma.category.createMany({
+          data: defaultCategories.map(category => ({
+            ...category,
+            userId: user.id
+          }))
+        })
 
-          if (!existingUser) {
-            // Create new user with default setup
-            await prisma.user.create({
-              data: {
-                email: user.email!,
-                name: user.name,
-                image: user.image,
-                categories: {
-                  create: defaultCategories
-                },
-                subscription: {
-                  create: {
-                    plan: 'FREE',
-                    status: 'active'
-                  }
-                }
-              }
-            })
-            console.log(`New user created: ${user.email}`)
-          } else {
-            // Update existing user info if needed
-            if (existingUser.name !== user.name || existingUser.image !== user.image) {
-              await prisma.user.update({
-                where: { email: user.email! },
-                data: {
-                  name: user.name,
-                  image: user.image
-                }
-              })
-            }
-            console.log(`Existing user signed in: ${user.email}`)
+        // Create default subscription
+        await prisma.subscription.create({
+          data: {
+            userId: user.id,
+            plan: 'FREE',
+            status: 'active'
           }
-        }
-        return true
+        })
+
+        console.log(`Default setup completed for new user: ${user.email}`)
       } catch (error) {
-        console.error("Error during sign in:", error)
-        // Return false to display an error page
-        return false
+        console.error("Error setting up new user:", error)
       }
-    },
-    async redirect({ url, baseUrl }) {
-      // Handle redirects after sign in
-      if (url.startsWith("/")) return `${baseUrl}${url}`
-      if (new URL(url).origin === baseUrl) return url
-      return `${baseUrl}/dashboard`
     }
   },
   pages: {
     signIn: "/signin",
     signOut: "/signin",
-    error: "/signin", // Error code passed in query string as ?error=
+    error: "/signin",
   },
   session: {
     strategy: "jwt",
