@@ -19,22 +19,23 @@ export const authOptions: NextAuthOptions = {
     })
   ],
   callbacks: {
-    async session({ session, token, user }) {
-      // Ensure session has user ID for database queries
-      if (session?.user && user?.id) {
-        session.user.id = user.id
+    async session({ session, token }) {
+      // When using JWT strategy, get user ID from token
+      if (token && session.user) {
+        session.user.id = token.sub || token.uid as string
       }
       return session
     },
-    async jwt({ token, user, account }) {
-      // Persist user ID in token
-      if (user) {
-        token.uid = user.id
+    async jwt({ token, user, account, profile }) {
+      // Initial sign in
+      if (account && user) {
+        return {
+          ...token,
+          uid: user.id,
+        }
       }
       return token
     },
-    // Remove the conflicting signIn callback - let PrismaAdapter handle it
-    // Instead, use the user creation event
   },
   events: {
     async createUser({ user }) {
