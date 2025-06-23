@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import { useSession } from 'next-auth/react'
 import { Button } from '@/components/ui/button'
 import { formatDistanceToNow } from 'date-fns'
 import { BellIcon, CheckIcon, TrashIcon, AlertCircleIcon } from 'lucide-react'
@@ -22,28 +23,54 @@ interface Notification {
 
 export function NotificationBell() {
   const router = useRouter()
+  const { data: session, status } = useSession()
   const [isOpen, setIsOpen] = useState(false)
   const [notifications, setNotifications] = useState<Notification[]>([])
   const [unreadCount, setUnreadCount] = useState(0)
   const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
   const [page, setPage] = useState(1)
 
-  // Fetch notifications
+  // Fetch notifications with enhanced error handling
   const fetchNotifications = async (pageNum = 1) => {
+    // Don't fetch if user is not authenticated
+    if (status !== 'authenticated' || !session?.user?.id) {
+      console.log('User not authenticated, skipping notification fetch')
+      return
+    }
+
     try {
       setIsLoading(true)
-      const response = await fetch(`/api/notifications?page=${pageNum}&limit=10`)
-      if (!response.ok) throw new Error('Failed to fetch notifications')
+      setError(null)
+      
+      const response = await fetch(`/api/notifications?page=${pageNum}&limit=10`, {
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include', // Ensure cookies are sent
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.error || `HTTP ${response.status}: ${response.statusText}`)
+      }
       
       const data = await response.json()
+      
       if (pageNum === 1) {
-        setNotifications(data.notifications)
+        setNotifications(data.notifications || [])
       } else {
-        setNotifications(prev => [...prev, ...data.notifications])
+        setNotifications(prev => [...prev, ...(data.notifications || [])])
       }
-      setUnreadCount(data.unreadCount)
+      setUnreadCount(data.unreadCount || 0)
     } catch (error) {
       console.error('Error fetching notifications:', error)
+      setError(error instanceof Error ? error.message : 'Failed to fetch notifications')
+      
+      // Only show toast for non-auth errors
+      if (!error.message?.includes('Unauthorized')) {
+        toast.error('Failed to load notifications')
+      }
     } finally {
       setIsLoading(false)
     }
@@ -51,26 +78,34 @@ export function NotificationBell() {
 
   // Initial fetch and periodic polling
   useEffect(() => {
-    fetchNotifications()
-    
-    // Poll for new notifications every 30 seconds
-    const interval = setInterval(() => {
-      fetchNotifications(1)
-    }, 30000)
-    
-    return () => clearInterval(interval)
-  }, [])
+    if (status === 'authenticated') {
+      fetchNotifications()
+      
+      // Poll for new notifications every 30 seconds
+      const interval = setInterval(() => {
+        fetchNotifications(1)
+      }, 30000)
+      
+      return () => clearInterval(interval)
+    }
+  }, [status, session])
 
   // Mark notification as read
   const markAsRead = async (notificationId: string) => {
     try {
       const response = await fetch('/api/notifications', {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
         body: JSON.stringify({ notificationIds: [notificationId] }),
       })
       
-      if (!response.ok) throw new Error('Failed to mark as read')
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.error || 'Failed to mark as read')
+      }
       
       setNotifications(prev =>
         prev.map(n => (n.id === notificationId ? { ...n, isRead: true } : n))
@@ -78,6 +113,7 @@ export function NotificationBell() {
       setUnreadCount(prev => Math.max(0, prev - 1))
     } catch (error) {
       console.error('Error marking notification as read:', error)
+      toast.error('Failed to mark notification as read')
     }
   }
 
@@ -86,16 +122,23 @@ export function NotificationBell() {
     try {
       const response = await fetch('/api/notifications', {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
         body: JSON.stringify({ markAllRead: true }),
       })
       
-      if (!response.ok) throw new Error('Failed to mark all as read')
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.error || 'Failed to mark all as read')
+      }
       
       setNotifications(prev => prev.map(n => ({ ...n, isRead: true })))
       setUnreadCount(0)
       toast.success('All notifications marked as read')
     } catch (error) {
+      console.error('Error marking all notifications as read:', error)
       toast.error('Failed to mark notifications as read')
     }
   }
@@ -105,9 +148,13 @@ export function NotificationBell() {
     try {
       const response = await fetch(`/api/notifications?id=${notificationId}`, {
         method: 'DELETE',
+        credentials: 'include',
       })
       
-      if (!response.ok) throw new Error('Failed to delete notification')
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.error || 'Failed to delete notification')
+      }
       
       setNotifications(prev => prev.filter(n => n.id !== notificationId))
       if (!notifications.find(n => n.id === notificationId)?.isRead) {
@@ -115,6 +162,7 @@ export function NotificationBell() {
       }
     } catch (error) {
       console.error('Error deleting notification:', error)
+      toast.error('Failed to delete notification')
     }
   }
 
@@ -162,6 +210,11 @@ export function NotificationBell() {
     }
   }
 
+  // Don't render if not authenticated
+  if (status !== 'authenticated') {
+    return null
+  }
+
   return (
     <div className="relative">
       <Button
@@ -204,7 +257,26 @@ export function NotificationBell() {
             </div>
 
             <div className="overflow-y-auto max-h-[480px] custom-scrollbar">
-              {notifications.length === 0 ? (
+              {error ? (
+                <div className="p-8 text-center">
+                  <AlertCircleIcon className="h-12 w-12 mx-auto mb-4 text-red-400" />
+                  <p className="text-red-600 mb-2">Failed to load notifications</p>
+                  <p className="text-sm text-gray-500 mb-4">{error}</p>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => fetchNotifications()}
+                    disabled={isLoading}
+                  >
+                    {isLoading ? 'Retrying...' : 'Try Again'}
+                  </Button>
+                </div>
+              ) : isLoading && notifications.length === 0 ? (
+                <div className="p-8 text-center">
+                  <div className="loading-spinner mx-auto mb-4" />
+                  <p className="text-gray-500">Loading notifications...</p>
+                </div>
+              ) : notifications.length === 0 ? (
                 <div className="p-8 text-center text-gray-500">
                   <BellIcon className="h-12 w-12 mx-auto mb-4 text-gray-300" />
                   <p>No notifications yet</p>
