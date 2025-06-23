@@ -4,6 +4,7 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { useSession, signOut } from "next-auth/react"
 import { Button } from "@/components/ui/button"
+import { NotificationBell } from "@/components/notifications/notification-bell"
 import { APP_NAME } from "@/lib/constants"
 import { cn } from "@/lib/utils"
 
@@ -54,6 +55,12 @@ export function Header() {
           <div className="flex items-center space-x-4">
             {session?.user && (
               <div className="flex items-center space-x-3">
+                {/* Notification Bell */}
+                <NotificationBell />
+                
+                <div className="h-8 w-px bg-gray-200" />
+                
+                {/* User Info */}
                 <div className="text-right">
                   <p className="text-sm font-medium text-gray-900">
                     {session.user.name}

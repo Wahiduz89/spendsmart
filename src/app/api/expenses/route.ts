@@ -4,18 +4,7 @@ import { authOptions } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import { z } from "zod"
 
-// Validation schema for expense creation
-const createExpenseSchema = z.object({
-  amount: z.number().positive("Amount must be positive"),
-  description: z.string().min(1, "Description is required"),
-  date: z.string().datetime(),
-  categoryId: z.string().optional(),
-  paymentMethod: z.enum(['CASH', 'CREDIT_CARD', 'DEBIT_CARD', 'UPI', 'WALLET', 'NET_BANKING', 'OTHER']),
-  merchant: z.string().optional(),
-  notes: z.string().optional(),
-})
-
-// GET: Fetch user expenses with filters
+// Enhanced GET endpoint with search and advanced filtering
 export async function GET(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
@@ -24,24 +13,68 @@ export async function GET(request: NextRequest) {
     }
 
     const searchParams = request.nextUrl.searchParams
+    
+    // Pagination
     const page = parseInt(searchParams.get("page") || "1")
     const limit = parseInt(searchParams.get("limit") || "20")
-    const categoryId = searchParams.get("categoryId")
+    
+    // Search and filters
+    const q = searchParams.get("q") // Global search query
+    const categoryId = searchParams.get("categoryId") || searchParams.get("category")
     const startDate = searchParams.get("startDate")
     const endDate = searchParams.get("endDate")
     const paymentMethod = searchParams.get("paymentMethod")
+    const merchant = searchParams.get("merchant")
+    const minAmount = searchParams.get("minAmount")
+    const maxAmount = searchParams.get("maxAmount")
+    const sortBy = searchParams.get("sortBy") || "date"
+    const sortOrder = searchParams.get("sortOrder") || "desc"
 
     // Build where clause
     const where: any = { userId: session.user.id }
     
+    // Global search across description, merchant, and notes
+    if (q) {
+      where.OR = [
+        { description: { contains: q, mode: 'insensitive' } },
+        { merchant: { contains: q, mode: 'insensitive' } },
+        { notes: { contains: q, mode: 'insensitive' } },
+      ]
+    }
+    
+    // Category filter
     if (categoryId) where.categoryId = categoryId
+    
+    // Payment method filter
     if (paymentMethod) where.paymentMethod = paymentMethod
     
+    // Merchant filter
+    if (merchant) {
+      where.merchant = { contains: merchant, mode: 'insensitive' }
+    }
+    
+    // Date range filter
     if (startDate || endDate) {
       where.date = {}
       if (startDate) where.date.gte = new Date(startDate)
       if (endDate) where.date.lte = new Date(endDate)
     }
+    
+    // Amount range filter
+    if (minAmount || maxAmount) {
+      where.amount = {}
+      if (minAmount) where.amount.gte = parseFloat(minAmount)
+      if (maxAmount) where.amount.lte = parseFloat(maxAmount)
+    }
+
+    // Build orderBy clause
+    const orderByMap: Record<string, any> = {
+      date: { date: sortOrder },
+      amount: { amount: sortOrder },
+      description: { description: sortOrder },
+      merchant: { merchant: sortOrder },
+    }
+    const orderBy = orderByMap[sortBy] || { date: 'desc' }
 
     // Fetch expenses with pagination
     const [expenses, total] = await Promise.all([
@@ -57,12 +90,48 @@ export async function GET(request: NextRequest) {
             }
           }
         },
-        orderBy: { date: 'desc' },
+        orderBy,
         skip: (page - 1) * limit,
         take: limit,
       }),
       prisma.expense.count({ where })
     ])
+
+    // Calculate aggregates for current filters
+    const aggregates = await prisma.expense.aggregate({
+      where,
+      _sum: { amount: true },
+      _avg: { amount: true },
+      _min: { amount: true },
+      _max: { amount: true },
+    })
+
+    // Get spending by category for current filters
+    const categoryBreakdown = await prisma.expense.groupBy({
+      by: ['categoryId'],
+      where,
+      _sum: { amount: true },
+      _count: true,
+    })
+
+    // Fetch category details for breakdown
+    const categoryIds = categoryBreakdown.map(c => c.categoryId).filter(Boolean) as string[]
+    const categories = await prisma.category.findMany({
+      where: { id: { in: categoryIds } }
+    })
+
+    const enrichedCategoryBreakdown = categoryBreakdown.map(item => {
+      const category = categories.find(c => c.id === item.categoryId)
+      return {
+        categoryId: item.categoryId,
+        categoryName: category?.name || 'Uncategorized',
+        categoryIcon: category?.icon,
+        categoryColor: category?.color,
+        totalAmount: item._sum.amount || 0,
+        transactionCount: item._count,
+        percentage: ((item._sum.amount || 0) / (aggregates._sum.amount || 1)) * 100
+      }
+    }).sort((a, b) => b.totalAmount - a.totalAmount)
 
     return NextResponse.json({
       expenses,
@@ -71,6 +140,26 @@ export async function GET(request: NextRequest) {
         limit,
         total,
         totalPages: Math.ceil(total / limit)
+      },
+      aggregates: {
+        totalAmount: aggregates._sum.amount || 0,
+        averageAmount: aggregates._avg.amount || 0,
+        minAmount: aggregates._min.amount || 0,
+        maxAmount: aggregates._max.amount || 0,
+        transactionCount: total,
+      },
+      categoryBreakdown: enrichedCategoryBreakdown,
+      filters: {
+        q,
+        categoryId,
+        paymentMethod,
+        merchant,
+        startDate,
+        endDate,
+        minAmount,
+        maxAmount,
+        sortBy,
+        sortOrder,
       }
     })
   } catch (error) {
@@ -82,7 +171,19 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// POST: Create new expense
+// Validation schema for expense creation
+const createExpenseSchema = z.object({
+  amount: z.number().positive("Amount must be positive"),
+  description: z.string().min(1, "Description is required"),
+  date: z.string().datetime(),
+  categoryId: z.string().optional(),
+  paymentMethod: z.enum(['CASH', 'CREDIT_CARD', 'DEBIT_CARD', 'UPI', 'WALLET', 'NET_BANKING', 'OTHER']),
+  merchant: z.string().optional(),
+  notes: z.string().optional(),
+  receiptUrl: z.string().optional(), // For receipt storage
+})
+
+// POST: Create new expense with receipt support
 export async function POST(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)

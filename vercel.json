@@ -1,0 +1,11 @@
+{
+    "crons": [
+      {
+        "path": "/api/cron/jobs",
+        "schedule": "0 */4 * * *",
+        "headers": {
+          "Authorization": "Bearer YOUR_CRON_SECRET"
+        }
+      }
+    ]
+  }

@@ -21,11 +21,13 @@ model User {
   updatedAt     DateTime  @updatedAt
 
   // Relations
-  accounts      Account[]
-  expenses      Expense[]
-  categories    Category[]
-  budgets       Budget[]
-  subscription  Subscription?
+  accounts               Account[]
+  expenses               Expense[]
+  categories             Category[]
+  budgets                Budget[]
+  subscription           Subscription?
+  notifications          Notification[]
+  notificationPreference NotificationPreference?
 
   @@index([email])
 }
@@ -51,7 +53,7 @@ model Account {
   @@index([userId])
 }
 
-// Expense entries
+// Expense entries with receipt support
 model Expense {
   id            String         @id @default(cuid())
   userId        String
@@ -71,11 +73,12 @@ model Expense {
   
   // Optional fields
   merchant      String?
-  receiptUrl    String?
+  receiptUrl    String?        // URL to uploaded receipt image
   notes         String?
   
   @@index([userId, date])
   @@index([categoryId])
+  @@index([merchant])
 }
 
 // Expense categories
@@ -133,6 +136,47 @@ model Subscription {
   user             User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
+// Notification model for alerts and updates
+model Notification {
+  id          String               @id @default(cuid())
+  userId      String
+  title       String
+  message     String
+  type        NotificationType
+  priority    NotificationPriority @default(MEDIUM)
+  isRead      Boolean             @default(false)
+  readAt      DateTime?
+  relatedId   String?             // ID of related entity (expense, budget, etc.)
+  relatedType String?             // Type of related entity
+  metadata    Json?               // Additional data for the notification
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+  
+  // Relations
+  user        User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@index([userId, isRead])
+  @@index([createdAt])
+}
+
+// User notification preferences
+model NotificationPreference {
+  id                String   @id @default(cuid())
+  userId            String   @unique
+  budgetAlerts      Boolean  @default(true)
+  budgetThreshold   Int      @default(80) // Alert when budget reaches this %
+  dailyDigest       Boolean  @default(false)
+  weeklyReport      Boolean  @default(true)
+  expenseReminders  Boolean  @default(true)
+  emailAlerts       Boolean  @default(true)
+  pushAlerts        Boolean  @default(false)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  
+  // Relations
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
 // Enums
 enum PaymentMethod {
   CASH
@@ -155,4 +199,21 @@ enum PlanType {
   FREE
   PREMIUM
   ENTERPRISE
+}
+
+enum NotificationType {
+  BUDGET_WARNING      // Budget reaching threshold
+  BUDGET_EXCEEDED     // Budget exceeded
+  EXPENSE_REMINDER    // Reminder to track expenses
+  WEEKLY_SUMMARY      // Weekly spending summary
+  MONTHLY_SUMMARY     // Monthly spending summary
+  ACHIEVEMENT         // Spending goal achieved
+  SYSTEM              // System notifications
+}
+
+enum NotificationPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
 }
